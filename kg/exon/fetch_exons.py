@@ -12,25 +12,42 @@ output = open('exon_seq_type.csv', 'w')
 writer = csv.writer(output)
 output_lock = threading.Lock()
 
-# load ensembl gene/transcript id, exon id, protein id, hgnc id, type, name, *sequence
-def load_geneID_annotation(filename):
+def process_line(line):
+    data_slice = line.split(";")
+    d = {}
+    for kv in data_slice[1:]:
+        k,v = kv.split("=")
+        d[k] = v
+    d["seq_type"] = data_slice[0].split("\t")[2]
+    return d
+
+# gene id, transcript id, hgnc_id, gene_type, gene_name, exon_id, protein_id
+def load_geneID_annotation(filename, count=100):
     global out
     visited = set()
     num_lines=0
     print("Reading "+filename+"...")
     with open(filename) as file:
-        while line:=file.readline():
+        while num_lines<count: 
+            line=file.readline()
             if(line[0]=="#"):
                 continue
-            # print(line)
-            data_slice = line.split(";")
-            if(data_slice[0].split('\t')[2]=="exon"):
-                gene_id = data_slice[9][8:-2]
-                gene_type = data_slice[4][10:]
-                if gene_id not in visited:
-                    out.append({"gene_id": gene_id, "gene_type": gene_type})
-                    visited.add(gene_id)
-            num_lines+=1
+            d = process_line(line)
+            if d["seq_type"]=="transcript" and d["gene_type"]=="protein_coding":
+                try:
+                    prefix = [d["gene_id"], d["transcript_id"], d["hgnc_id"], d["gene_type"], d["gene_name"]] # ensembl gene id, transcript id, hgnc id, gene_type, gene_name
+                except KeyError:
+                    continue
+
+                row = [] # exon id, protein id
+                while d["seq_type"] != "gene":
+                    if d["seq_type"]=="exon" and d["gene_type"]=="protein_coding":
+                        row = [d["exon_id"], d["protein_id"]]
+                        row = prefix + row
+                        out.append(row)
+                        num_lines+=1
+                    d=process_line(file.readline())
+
 
 def post_request(ids_chunk, out_chunk):
     headers={ "Content-Type" : "application/json", "Accept" : "application/json"}
@@ -48,7 +65,7 @@ def post_request(ids_chunk, out_chunk):
     
     decoded = r.json()
     for gene, gene_seq in zip(out_chunk, decoded):
-        gene['gene'] = gene_seq['seq']
+        gene.append(gene_seq['seq'])
     
     return out_chunk
 
@@ -74,30 +91,35 @@ def fetch_chunk(chunk, chunk_size, isLast=False):
     else:
         out_chunk = out[idx(chunk):]
 
-    idx_chunk = [gene["gene_id"] for gene in out_chunk]
+    idx_chunk = [gene[-2] for gene in out_chunk]
+    # idx_chunk - list of exon_ids( we send requests based on this )
+    # out_chunk - rest of the data, associated with every exon_id
+    # they are sent as a tuple to maintain their coupling / association
     return [idx_chunk, out_chunk]
 
-load_geneID_annotation(sys.argv[1])
-print(out, file=open("output.txt", 'w'))
-chunkify()
-writer.writerow(["id","type","seq"])
-total = q.qsize()
+def clean_rows():
+    global out
+    for line in out: 
+        line[0], line[1], line[-2], line[-1] = line[0][0:15], line[1][0:15], line[-2][0:15], line[-1][0:15]
 
+labels = ["gene_id", "transcript_id", "hgnc_id", "gene_type", "gene_name", "exon_id", "protein_id", "sequence"]
+load_geneID_annotation(sys.argv[1], int(sys.argv[2]))
+clean_rows()
+print(f"got {len(out)} exon data slices!")
+# print(out, file=open("output.txt", 'w'))
+chunkify()
+writer.writerow(labels)
+total = q.qsize()
 
 def worker(thread_number):
     global chunks, total
     out = []
     while not q.empty():
         idx_chunk, out_chunk = q.get()
-        resp = post_request(json.dumps(idx_chunk), out_chunk)
-        resp = list(filter(lambda x: len(x)==3, resp))
-        
-        for gene in resp:
-            out.append([gene["gene_id"], gene["gene_type"], gene["gene"]])
-        
+        resp = post_request(json.dumps(idx_chunk), out_chunk) # output, evne thought it's coalesced, is still chunked
         # now we have result, want to write it
         with output_lock:  # this will block until the lock is available
-            writer.writerows(out)
+            writer.writerows(resp)
         print(f"CHUNKS({chunks+1}/{total}): Thread {thread_number} got {len(resp)} results!")
         chunks+=1
         q.task_done()
@@ -111,4 +133,4 @@ except RuntimeError as e:
 
 print("waiting for all tasks to complete")
 chunks = 0
-# q.join()
+# # q.join()
