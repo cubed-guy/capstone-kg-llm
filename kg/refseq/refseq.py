@@ -42,24 +42,14 @@ def enumerate_example():
 
 def process_line(line):
     slice = line.split(";")
-    transcript = slice[0].split("\t")
-    if transcript[2]!="exon" or transcript[2]!="gene":
-        refseq = transcript[0]
-        # hgnc = slice[2].split(",")[2]
-        hgnc = slice[2].split(",")
-        if len(hgnc)<3:
-            hgnc = None
-        else:
-            hgnc = hgnc[2].split(":")[2]
-
-        attrs = slice[3:]
-        attr = [None]*len(example) # read values in the same order of 'example'. values may or may not be in each record/line read from file.
-        for kv in attrs:
+    seq_type = slice[0].split("\t")
+    if seq_type[2]=="CDS":
+        refseq = seq_type[-1].split("=")[1]
+        d = {}
+        for kv in slice[1:]:
             k, v = kv.split("=")
-            if k in example:
-                attr[example[k]] = v
-        # print(attr)
-        return [hgnc, refseq, *attr]    
+            d[k] = v
+        return [d["hgnc_id"], refseq]    
     return None
 
 def load_refseq_data(filename, count=-1):
@@ -75,18 +65,11 @@ def load_refseq_data(filename, count=-1):
     with open(filename) as file:
         if all:
             while line:=file.readline():
-                line = file.readline()
                 if(line[0]=="#"):
                     continue
-
-                slice = line.split(";")
-                type = slice[0].split("\t")[2]
-                if type not in d:
-                    d[type] = line
-
-                # res = process_line(line)
-                # if not res: continue
-                # out.append(res)
+                res = process_line(line)
+                if not res: continue
+                out.append(res)
         else:
             while cur<count:
                 line = file.readline()
