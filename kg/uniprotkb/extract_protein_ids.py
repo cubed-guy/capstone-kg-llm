@@ -5,7 +5,7 @@
 import csv
 
 li = []
-with open("data/exon/exon_sequences.csv", "r") as f:
+with open("data/exons/exon_sequences.csv", "r") as f:
     reader = csv.reader(f)
     for row in reader:
         li.append(row[-2])

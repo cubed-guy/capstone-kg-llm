@@ -26,13 +26,23 @@ def load_geneID_annotation(filename, count=100):
     global out
     visited = set()
     num_lines=0
+
+    foundTranscript = False
+    preceded = set()
+
     print("Reading "+filename+"...")
     with open(filename) as file:
         while num_lines<count: 
-            line=file.readline()
-            if(line[0]=="#"):
-                continue
-            d = process_line(line)
+            # line=file.readline()
+
+            if foundTranscript:
+                foundTranscript = False
+            else:
+                line=file.readline()
+                if(line[0]=="#"):
+                    continue
+                d = process_line(line)
+
             if d["seq_type"]=="transcript" and d["gene_type"]=="protein_coding":
                 try:
                     prefix = [d["gene_id"], d["transcript_id"], d["hgnc_id"], d["gene_type"], d["gene_name"]] # ensembl gene id, transcript id, hgnc id, gene_type, gene_name
@@ -40,14 +50,19 @@ def load_geneID_annotation(filename, count=100):
                     continue
 
                 row = [] # exon id, protein id
-                while d["seq_type"] != "gene":
+                # while d["seq_type"] != "gene" and d["seq_type"]!="three_prime_UTR":
+                while True:
+                    d=process_line(file.readline())
                     if d["seq_type"]=="exon" and d["gene_type"]=="protein_coding":
                         row = [d["exon_id"], d["protein_id"]]
                         row = prefix + row
                         out.append(row)
                         num_lines+=1
-                    d=process_line(file.readline())
+                    if d["seq_type"] == "transcript":
+                        foundTranscript = True
+                        break
 
+    print(f"every sequence type preceding a transcript: {preceded}")
 
 def post_request(ids_chunk, out_chunk):
     headers={ "Content-Type" : "application/json", "Accept" : "application/json"}
@@ -104,11 +119,34 @@ def clean_rows():
 
 labels = ["gene_id", "transcript_id", "hgnc_id", "gene_type", "gene_name", "exon_id", "protein_id", "sequence"]
 load_geneID_annotation(sys.argv[1], int(sys.argv[2]))
+print(f"len: {len(out)}")
 clean_rows()
+print(f"len: {len(out)}")
+
+s = set()
+td = {}
+for li in out:
+    # s.add(tuple(li))
+    # s.add(li[0])
+    s.add((li[1], li[-1]))
+print(f"unique records: {len(s)}")
+
+for t, p in s:
+    if t not in td:
+        td[t] = []
+    td[t].append(p)
+
+print(f"got {len(td)} unique transcripts")
+
+for k,v in td.items():
+    if len(v)>1:
+        print(k, v)
+
 print(f"got {len(out)} exon data slices!")
-# print(out, file=open("output.txt", 'w'))
+# # print(out, file=open("output.txt", 'w'))
 chunkify()
 writer.writerow(labels)
+# writer.writerows(out)
 total = q.qsize()
 
 def worker(thread_number):
@@ -125,7 +163,7 @@ def worker(thread_number):
         q.task_done()
 
 try:
-    for thread in range(16):
+    for thread in range(8):
         threading.Thread(target=worker, args=(thread,)).start()
 except RuntimeError as e:
     print(f"Reached thread limit: {e}")
