@@ -128,47 +128,47 @@ td = {}
 for li in out:
     # s.add(tuple(li))
     # s.add(li[0])
-    s.add((li[1], li[-1]))
+    s.add(li[-2])
 print(f"unique records: {len(s)}")
 
-for t, p in s:
-    if t not in td:
-        td[t] = []
-    td[t].append(p)
+# for t, p in s:
+#     if t not in td:
+#         td[t] = []
+#     td[t].append(p)
 
-print(f"got {len(td)} unique transcripts")
+# print(f"got {len(td)} unique transcripts")
 
-for k,v in td.items():
-    if len(v)>1:
-        print(k, v)
+# for k,v in td.items():
+#     if len(v)>1:
+#         print(k, v)
 
 print(f"got {len(out)} exon data slices!")
 # # print(out, file=open("output.txt", 'w'))
-chunkify()
-writer.writerow(labels)
-# writer.writerows(out)
-total = q.qsize()
+# chunkify()
+# writer.writerow(labels)
+# # writer.writerows(out)
+# total = q.qsize()
 
-def worker(thread_number):
-    global chunks, total
-    out = []
-    while not q.empty():
-        idx_chunk, out_chunk = q.get()
-        resp = post_request(json.dumps(idx_chunk), out_chunk) # output, evne thought it's coalesced, is still chunked
-        # now we have result, want to write it
-        with output_lock:  # this will block until the lock is available
-            writer.writerows(resp)
-        print(f"CHUNKS({chunks+1}/{total}): Thread {thread_number} got {len(resp)} results!")
-        chunks+=1
-        q.task_done()
+# def worker(thread_number):
+#     global chunks, total
+#     out = []
+#     while not q.empty():
+#         idx_chunk, out_chunk = q.get()
+#         resp = post_request(json.dumps(idx_chunk), out_chunk) # output, evne thought it's coalesced, is still chunked
+#         # now we have result, want to write it
+#         with output_lock:  # this will block until the lock is available
+#             writer.writerows(resp)
+#         print(f"CHUNKS({chunks+1}/{total}): Thread {thread_number} got {len(resp)} results!")
+#         chunks+=1
+#         q.task_done()
 
-try:
-    for thread in range(8):
-        threading.Thread(target=worker, args=(thread,)).start()
-except RuntimeError as e:
-    print(f"Reached thread limit: {e}")
+# try:
+#     for thread in range(8):
+#         threading.Thread(target=worker, args=(thread,)).start()
+# except RuntimeError as e:
+#     print(f"Reached thread limit: {e}")
 
 
-print("waiting for all tasks to complete")
-chunks = 0
+# print("waiting for all tasks to complete")
+# chunks = 0
 # # q.join()

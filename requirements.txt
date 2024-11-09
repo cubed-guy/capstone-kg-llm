@@ -1,0 +1,13 @@
+py2neo
+gffpandas
+levenshtein
+einops
+transformers==4.29.2
+peft
+omegaconf
+torch
+evaluate
+accelerate
+jsonschema==3.0.2
+Flask
+python-dotenv

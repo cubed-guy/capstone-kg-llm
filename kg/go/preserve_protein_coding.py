@@ -17,8 +17,8 @@ df2 = pd.read_csv(base+"go/ensembl_go_mappings.csv")
 print(df1.head())
 print(df2.head())
 
-merged_df = pd.merge(df2, df1, left_on='ensembl', right_on='exon_id')
-preserve_columns = ["exon_id", "go"]
+merged_df = pd.merge(df2, df1, left_on='ensembl', right_on='gene_id')
+preserve_columns = ["gene_id", "go"]
 filtered_df = clean_df(merged_df, preserve_columns)
 
 filtered_df.to_csv(base+'go/ensembl_go_protein_coding.csv', index=False)

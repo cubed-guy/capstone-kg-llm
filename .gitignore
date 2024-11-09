@@ -4,3 +4,6 @@ data
 *.tsv
 *.gz
 *.zip
+.env
+!.gitignore
+!requirements.txt
