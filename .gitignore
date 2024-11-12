@@ -7,3 +7,4 @@ data
 .env
 !.gitignore
 !requirements.txt
+package-lock.json
