@@ -35,7 +35,7 @@ export default function Chat() {
 
   return (
     <div className="container">
-      <h1 className="title">capstone lol</h1>
+      <h1 className="title">Capstone: Gene Sequence Search</h1>
       <div className="chat-box">
         <div className="response-container">
           {responses.map((response, index) => (
